@@ -37,46 +37,38 @@ logger.addHandler(ch)
 
 def download_range(begin, end, directory, seccion, provincia=None):
     """ Downloads PDFs using threads """
-    next_date = begin
+    if begin > end:
+        raise ValueError('begin > end')
+    
     total_downloaded = 0
+    next_date = begin
 
-    while next_date and next_date <= end:
-        path = get_borme_pdf_path(next_date, directory)
-        xml_path = get_borme_xml_filepath(next_date, directory)
-        logger.info('\nDownloading files from {} (sección {}) to {}\n'.format(next_date, seccion, path))
+    path = get_borme_pdf_path(next_date, directory)
+    xml_path = get_borme_xml_filepath(next_date, directory)
+    logger.info('\nDownloading files from {} (sección {}) to {}\n'.format(next_date, seccion, path))
+    try:
+        bxml = BormeXML.from_file(xml_path)
+        bxml.save_to_file(xml_path)
+
+    except IOError:
+        logger.debug('Downloading {filename}'.format(filename=os.path.basename(xml_path)))
+        bxml = BormeXML.from_date(next_date)
         try:
-            bxml = BormeXML.from_file(xml_path)
-            if bxml.next_borme:
-                logger.debug('{filename} already exists!'.format(filename=os.path.basename(xml_path)))
-            else:
-                logger.debug('Re-downloading {filename}'.format(filename=os.path.basename(xml_path)))
-                bxml = BormeXML.from_date(next_date)
-                try:
-                    os.makedirs(os.path.dirname(xml_path))
-                except OSError:
-                    pass
-                bxml.save_to_file(xml_path)
-
-        except IOError:
-            logger.debug('Downloading {filename}'.format(filename=os.path.basename(xml_path)))
-            bxml = BormeXML.from_date(next_date)
-            try:
-                os.makedirs(os.path.dirname(xml_path))
-            except OSError:
-                pass
-            bxml.save_to_file(xml_path)
-
-        try:
-            os.makedirs(path)
+            os.makedirs(os.path.dirname(xml_path))
         except OSError:
             pass
+        bxml.save_to_file(xml_path)
 
-        _, files = bxml.download_borme(path, provincia=provincia, seccion=seccion)
+    try:
+        os.makedirs(path)
+    except OSError:
+        pass
 
-        if len(files) > 0:
-            logger.info('Downloaded {} files from {}'.format(len(files), next_date))
-        total_downloaded += len(files)
-        next_date = bxml.next_borme
+    _, files = bxml.download_borme(path, provincia=provincia, seccion=seccion)
+
+    if len(files) > 0:
+        logger.info('Downloaded {} files from {}'.format(len(files), next_date))
+    total_downloaded += len(files)
 
     logger.info('\n{} total files were downloaded'.format(total_downloaded))
 
@@ -117,6 +109,6 @@ if __name__ == '__main__':
         date_to = datetime.datetime.strptime(args.to, '%Y-%m-%d').date()
 
     try:
-        download_range(date_from, date_to, args.directory, args.seccion, args.provincia)
+        download_range(date_from, date_from, args.directory, args.seccion, args.provincia)
     except BormeDoesntExistException:
         logger.warn('It looks like there is no BORME for the start date ({}). Nothing was downloaded'.format(date_from))
