@@ -221,6 +221,9 @@ class BormeXML(object):
         if self.xml.getroot().tag != "response":
             raise BormeDoesntExistException
 
+        if self.xml.xpath("//response/status/code")[0].text != "200":
+            raise BormeDoesntExistException
+
         self.date = parse_date(
             self.xml.xpath("//response/data/sumario/metadatos/fecha_publicacion")[
                 0
@@ -229,8 +232,7 @@ class BormeXML(object):
         self.nbo = int(
             self.xml.xpath("//response/data/sumario/diario")[0].attrib["numero"]
         )  # Número de Boletín Oficial
-        self.is_final = True
-        self.next_borme = None
+        self.next_borme = self.date + datetime.timedelta(days=1)
 
     @property
     def url(self):
@@ -261,7 +263,7 @@ class BormeXML(object):
         bxml.use_https = secure
         bxml._url = url
         bxml._load(url)
-        print(bxml.date)
+        
         assert date == bxml.date
         return bxml
 
